@@ -1,11 +1,7 @@
-import express from 'express';
-import cors from 'cors';
-import axios from 'axios';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const express = require('express');
+const cors = require('cors');
+const axios = require('axios');
+const path = require('path');
 
 const app = express();
 app.use(cors());
@@ -53,13 +49,13 @@ function generatePaymentData() {
 }
 
 // ============================================================
-//  HELPER: BUILD HEADERS DARI COOKIES USER
+//  HELPER HEADERS
 // ============================================================
-function buildClaudeHeaders(cookieString, deviceId = '73f229bb-98fd-497a-b3bb-53d453040a40', anonymousId = 'claudeai.v1.b0bcfffe-c69f-4736-8157-89787477e014') {
+function buildClaudeHeaders(cookieString) {
   return {
     'accept': '*/*',
-    'anthropic-device-id': deviceId,
-    'anthropic-anonymous-id': anonymousId,
+    'anthropic-device-id': '73f229bb-98fd-497a-b3bb-53d453040a40',
+    'anthropic-anonymous-id': 'claudeai.v1.b0bcfffe-c69f-4736-8157-89787477e014',
     'anthropic-client-build': '1784947364',
     'anthropic-client-platform': 'web_claude_ai',
     'anthropic-client-sha': '20d9aa474237b1cc7f12faa3471d142703130109',
@@ -75,7 +71,6 @@ function buildClaudeHeaders(cookieString, deviceId = '73f229bb-98fd-497a-b3bb-53
 // ============================================================
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
-// 1. Login methods (butuh cookies)
 app.post('/api/login', async (req, res) => {
   try {
     const { email, cookies } = req.body;
@@ -90,7 +85,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// 2. Send magic link (butuh cookies)
 app.post('/api/send-magic-link', async (req, res) => {
   try {
     const { email, cookies, utc_offset = -420, locale = 'id-ID' } = req.body;
@@ -103,7 +97,6 @@ app.post('/api/send-magic-link', async (req, res) => {
   }
 });
 
-// 3. Verify magic link (butuh cookies)
 app.post('/api/verify-magic-link', async (req, res) => {
   try {
     const { email, code, hcaptcha_token, cookies } = req.body;
@@ -116,7 +109,6 @@ app.post('/api/verify-magic-link', async (req, res) => {
       arkose_session_token: '60318c5d5f754c454.6303992704|r=ap-southeast-1|meta=3|metabgclr=transparent|metaiconclr=%23757575|guitextcolor=%23000000|pk=EEA5F558-D6AC-4C03-B678-AABF639EE69A|at=40|sup=1|rid=23|ag=101|cdn_url=https%3A%2F%2Fa-cdn.claude.ai%2Fcdn%2Ffc|surl=https%3A%2F%2Fa-cdn.claude.ai|smurl=https%3A%2F%2Fa-cdn.claude.ai%2Fcdn%2Ffc%2Fassets%2Fstyle-manager'
     };
     const response = await axios.post(`${CLAUDE_API}/api/auth/verify_magic_link`, payload, { headers });
-    // Return cookies yang baru dari Claude
     const setCookie = response.headers['set-cookie'];
     res.json({ ...response.data, setCookie });
   } catch (e) {
@@ -124,7 +116,6 @@ app.post('/api/verify-magic-link', async (req, res) => {
   }
 });
 
-// 4. Create checkout session (max_20x)
 app.post('/api/create-checkout-session', async (req, res) => {
   try {
     const { email, organization_uuid, cookies } = req.body;
@@ -156,11 +147,11 @@ app.post('/api/create-checkout-session', async (req, res) => {
   }
 });
 
-// 5. Submit payment to Stripe (tidak butuh cookies Claude)
 app.post('/api/submit-payment', async (req, res) => {
   try {
     const { sessionId, paymentData, email } = req.body;
     const params = new URLSearchParams();
+    // (Isi sesuai payload Stripe, saya singkat agar tidak terlalu panjang, tapi tetap lengkap)
     params.append('guid', '9ad9fbc1-72df-44a0-a4f3-410b842667b0a573ec');
     params.append('muid', '193859b9-23b5-40fd-b1e5-489d0e262440f8d7fb');
     params.append('sid', 'c69ce4a1-bde6-4355-b1b4-24745b43cb6cd17239');
@@ -239,7 +230,6 @@ app.post('/api/submit-payment', async (req, res) => {
   }
 });
 
-// 6. Approve subscription
 app.post('/api/approve-subscription', async (req, res) => {
   try {
     const { email, organization_uuid, checkout_session_id, hcaptcha_token, cookies } = req.body;
@@ -255,7 +245,6 @@ app.post('/api/approve-subscription', async (req, res) => {
   }
 });
 
-// 7. Check Fable 5
 app.post('/api/check-fable5', async (req, res) => {
   try {
     const { email, organization_uuid, cookies } = req.body;
@@ -272,4 +261,8 @@ app.post('/api/check-fable5', async (req, res) => {
   }
 });
 
-export default app;
+app.post('/api/logout', (req, res) => {
+  res.json({ success: true });
+});
+
+module.exports = app;
