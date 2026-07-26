@@ -4,21 +4,15 @@ const axios = require('axios');
 const path = require('path');
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
-
-// 🔥 Serve static files from 'public' folder (Vercel akan menemukannya)
 app.use(express.static(path.join(__dirname, '../public')));
 
-// 🔥 Handler untuk root path '/'
+// Root handler
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-// ============================================
-// CONSTANTS & HELPERS
-// ============================================
 const CLAUDE_API = 'https://claude.ai';
 const userSessions = new Map();
 
@@ -41,9 +35,7 @@ function getHeadersWithSession(email) {
   };
 }
 
-// ============================================
-// API ENDPOINTS
-// ============================================
+// ==================== API ENDPOINTS ====================
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -72,7 +64,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// 2. Kirim magic link
+// 2. Send magic link
 app.post('/api/send-magic-link', async (req, res) => {
   try {
     const { email, utc_offset = -420, locale = 'id-ID' } = req.body;
@@ -102,7 +94,7 @@ app.post('/api/send-magic-link', async (req, res) => {
   }
 });
 
-// 3. Verifikasi magic link
+// 3. Verify magic link
 app.post('/api/verify-magic-link', async (req, res) => {
   try {
     const { email, code, hcaptcha_token, arkose_session_token } = req.body;
@@ -154,79 +146,48 @@ app.post('/api/verify-magic-link', async (req, res) => {
   }
 });
 
-// 4. Buat payment (simulasi)
+// 4. Create payment (simulasi) - hanya generate IBAN
 app.post('/api/create-payment', async (req, res) => {
   try {
     const { email, organization_uuid, name } = req.body;
     const iban = generateGermanIBAN();
 
-    const sessionData = {
-      id: `cs_live_${Math.random().toString(36).substring(7)}`,
-      client_reference_id: organization_uuid,
-      customer: {
-        email: email,
-        name: name || 'Customer'
-      },
-      payment_method_types: ['card', 'sepa_debit'],
-      currency: 'eur',
-      mode: 'subscription'
-    };
-
     res.json({
       success: true,
-      session: sessionData,
       iban: iban,
-      payment_intent_id: `pi_${Math.random().toString(36).substring(7)}`
+      organization_uuid: organization_uuid
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// 5. Approve subscription (payload diperbaiki)
+// 5. Approve subscription - BYPASS (langsung sukses)
 app.post('/api/approve-subscription', async (req, res) => {
   try {
-    const { email, organization_uuid, checkout_session_id, hcaptcha_token } = req.body;
-
-    if (!hcaptcha_token) {
-      return res.status(400).json({ error: 'hCaptcha token required for approval' });
-    }
-
-    const headers = getHeadersWithSession(email);
-    if (!headers.cookie) {
-      return res.status(401).json({ error: 'No session found for this user. Please login again.' });
-    }
-
-    // 🔥 Perbaikan: hcaptcha_token di dalam client_attestation
-    const payload = {
-      client_attestation: {
-        hcaptcha_token: hcaptcha_token
-      }
-    };
-
-    console.log('Sending approve payload:', JSON.stringify(payload, null, 2));
-
-    const response = await axios.post(
-      `${CLAUDE_API}/api/organizations/${organization_uuid}/subscription/checkout_session/${checkout_session_id}/approve`,
-      payload,
-      { headers }
-    );
-
-    res.json(response.data);
+    const { email, organization_uuid } = req.body;
+    
+    // Simulasi approve sukses tanpa panggil Claude API
+    console.log(`✅ Payment approved for ${email} (simulated)`);
+    
+    res.json({
+      type: 'success',
+      message: 'Payment approved (simulated)',
+      idvRequirement: null
+    });
   } catch (error) {
-    console.error('Approve error:', error.response?.data || error.message);
-    res.status(500).json({ error: error.response?.data || error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
-// 6. Cek Fable 5
+// 6. Check Fable 5 - real call ke Claude API
 app.post('/api/check-fable5', async (req, res) => {
   try {
     const { email, organization_uuid } = req.body;
 
     const headers = getHeadersWithSession(email);
     if (!headers.cookie) {
-      return res.status(401).json({ error: 'No session found for this user. Please login again.' });
+      return res.status(401).json({ error: 'No session found. Please login again.' });
     }
 
     const response = await axios.patch(
@@ -244,6 +205,7 @@ app.post('/api/check-fable5', async (req, res) => {
     });
   } catch (error) {
     console.error('Check fable5 error:', error.response?.data || error.message);
+    // Jika error karena session expired, kita tetap return hasFable5 false
     res.json({
       success: false,
       hasFable5: false,
@@ -259,7 +221,4 @@ app.post('/api/logout', (req, res) => {
   res.json({ success: true });
 });
 
-// ============================================
-// EKSPOR UNTUK VERCEL (serverless)
-// ============================================
 export default app;
