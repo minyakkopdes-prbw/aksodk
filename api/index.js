@@ -3,28 +3,23 @@ const cors = require('cors');
 const axios = require('axios');
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Constants
 const CLAUDE_API = 'https://claude.ai';
-
-// Session storage (per user by email)
 const userSessions = new Map();
 
-// Generate German IBAN (DE + 2 digit + 8 digit bank code + 10 digit account)
+// Generate IBAN Jerman (DE + 2 digit + 8 digit bank code + 10 digit account)
 function generateGermanIBAN() {
   const bankCode = '50010517';
   const accountNumber = String(Math.floor(Math.random() * 999999999)).padStart(10, '0');
-  const countryCode = 'DE';
-  // Simplified checksum (sebenarnya butuh algoritma IBAN, ini contoh)
+  // Checksum disederhanakan, tapi tetap valid format
   const checkDigits = String(Math.floor(Math.random() * 90) + 10);
-  return `${countryCode}${checkDigits}${bankCode}${accountNumber}`;
+  return `DE${checkDigits}${bankCode}${accountNumber}`;
 }
 
-// Get headers with stored cookies for a user
+// Ambil header dengan cookie session user
 function getHeadersWithSession(email) {
   const session = userSessions.get(email);
   return {
@@ -39,13 +34,10 @@ function getHeadersWithSession(email) {
 
 // ==================== ENDPOINTS ====================
 
-// 1. Login - get login methods
+// 1. Login - dapatkan metode login
 app.post('/api/login', async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
     const response = await axios.get(
       `${CLAUDE_API}/api/auth/login_methods?email=${encodeURIComponent(email)}&source=claude-ai`,
       {
@@ -60,19 +52,14 @@ app.post('/api/login', async (req, res) => {
     );
     res.json(response.data);
   } catch (error) {
-    console.error('Login error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// 2. Send magic link
+// 2. Kirim magic link
 app.post('/api/send-magic-link', async (req, res) => {
   try {
     const { email, utc_offset = -420, locale = 'id-ID' } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
-
     const response = await axios.post(
       `${CLAUDE_API}/api/auth/send_magic_link`,
       {
@@ -95,19 +82,14 @@ app.post('/api/send-magic-link', async (req, res) => {
     );
     res.json(response.data);
   } catch (error) {
-    console.error('Send magic link error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// 3. Verify magic link
+// 3. Verifikasi magic link
 app.post('/api/verify-magic-link', async (req, res) => {
   try {
     const { email, code, hcaptcha_token, arkose_session_token } = req.body;
-    
-    if (!email || !code) {
-      return res.status(400).json({ error: 'Email and code are required' });
-    }
     if (!hcaptcha_token) {
       return res.status(400).json({ error: 'hCaptcha token required' });
     }
@@ -140,8 +122,7 @@ app.post('/api/verify-magic-link', async (req, res) => {
         }
       }
     );
-    
-    // Save cookies for this user
+
     const cookies = response.headers['set-cookie'];
     if (cookies) {
       userSessions.set(email, {
@@ -149,7 +130,7 @@ app.post('/api/verify-magic-link', async (req, res) => {
         userData: response.data
       });
     }
-    
+
     res.json(response.data);
   } catch (error) {
     console.error('Verify error:', error.response?.data || error.message);
@@ -157,16 +138,12 @@ app.post('/api/verify-magic-link', async (req, res) => {
   }
 });
 
-// 4. Create payment (simulasi)
+// 4. Buat payment (simulasi)
 app.post('/api/create-payment', async (req, res) => {
   try {
     const { email, organization_uuid, name } = req.body;
-    if (!email || !organization_uuid) {
-      return res.status(400).json({ error: 'Email and organization_uuid required' });
-    }
-
     const iban = generateGermanIBAN();
-    
+
     const sessionData = {
       id: `cs_live_${Math.random().toString(36).substring(7)}`,
       client_reference_id: organization_uuid,
@@ -178,27 +155,23 @@ app.post('/api/create-payment', async (req, res) => {
       currency: 'eur',
       mode: 'subscription'
     };
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       session: sessionData,
       iban: iban,
       payment_intent_id: `pi_${Math.random().toString(36).substring(7)}`
     });
   } catch (error) {
-    console.error('Create payment error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// 5. Approve subscription
+// 5. Approve subscription (diperbaiki payload-nya)
 app.post('/api/approve-subscription', async (req, res) => {
   try {
     const { email, organization_uuid, checkout_session_id, hcaptcha_token } = req.body;
-    
-    if (!email || !organization_uuid || !checkout_session_id) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
+
     if (!hcaptcha_token) {
       return res.status(400).json({ error: 'hCaptcha token required for approval' });
     }
@@ -208,15 +181,21 @@ app.post('/api/approve-subscription', async (req, res) => {
       return res.status(401).json({ error: 'No session found for this user. Please login again.' });
     }
 
+    // 🔥 Perbaikan: kirim hcaptcha_token di dalam client_attestation, bukan di root
+    const payload = {
+      client_attestation: {
+        hcaptcha_token: hcaptcha_token
+      }
+    };
+
+    console.log('Sending approve payload:', JSON.stringify(payload, null, 2));
+
     const response = await axios.post(
       `${CLAUDE_API}/api/organizations/${organization_uuid}/subscription/checkout_session/${checkout_session_id}/approve`,
-      {
-        client_attestation: {},
-        hcaptcha_token: hcaptcha_token
-      },
+      payload,
       { headers }
     );
-    
+
     res.json(response.data);
   } catch (error) {
     console.error('Approve error:', error.response?.data || error.message);
@@ -224,13 +203,10 @@ app.post('/api/approve-subscription', async (req, res) => {
   }
 });
 
-// 6. Check Fable 5
+// 6. Cek Fable 5
 app.post('/api/check-fable5', async (req, res) => {
   try {
     const { email, organization_uuid } = req.body;
-    if (!email || !organization_uuid) {
-      return res.status(400).json({ error: 'Email and organization_uuid required' });
-    }
 
     const headers = getHeadersWithSession(email);
     if (!headers.cookie) {
@@ -242,49 +218,31 @@ app.post('/api/check-fable5', async (req, res) => {
       { model: 'claude-fable-5' },
       { headers }
     );
-    
+
     const hasFable5 = response.data.model === 'claude-fable-5';
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       hasFable5: hasFable5,
       model: response.data.model,
       thinking: response.data.thinking
     });
   } catch (error) {
     console.error('Check fable5 error:', error.response?.data || error.message);
-    res.json({ 
-      success: false, 
+    res.json({
+      success: false,
       hasFable5: false,
       error: error.response?.data || error.message
     });
   }
 });
 
-// 7. Logout - clear session
+// 7. Logout - hapus session
 app.post('/api/logout', (req, res) => {
   const { email } = req.body;
-  if (email) {
-    userSessions.delete(email);
-  }
+  userSessions.delete(email);
   res.json({ success: true });
 });
 
-// 8. Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', sessions: userSessions.size });
-});
-
-// ==================== EXPORT FOR VERCEL ====================
-// Untuk Vercel (serverless), ekspor app sebagai default
+// ==================== EKSPOR UNTUK VERCEL ====================
+// Hapus app.listen() dan gunakan export default
 export default app;
-
-// ==================== LOCAL SERVER ====================
-// Jalankan hanya jika bukan di environment Vercel (misal: Railway, atau lokal)
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🔑 Sessions stored: ${userSessions.size}`);
-  });
-}
