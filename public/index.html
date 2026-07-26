@@ -90,47 +90,20 @@
         }
         .result-box h3 { color: #66bb6a; margin-bottom: 8px; }
         .result-box p { color: #c8d6e5; font-size: 14px; }
-        .bypass-badge {
-            background: rgba(255,193,7,0.15);
-            border: 1px solid rgba(255,193,7,0.2);
-            border-radius: 8px;
-            padding: 8px 12px;
-            font-size: 12px;
-            color: #ffc107;
-            text-align: center;
-            margin-bottom: 12px;
-        }
-        .checkbox-container {
+        .captcha-container {
             display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 16px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 12px;
-            border: 1px solid rgba(255,255,255,0.1);
-            cursor: pointer;
-            transition: all 0.3s;
+            justify-content: center;
+            margin: 16px 0;
         }
-        .checkbox-container:hover {
-            background: rgba(255,255,255,0.08);
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
         }
-        .checkbox-container input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            accent-color: #4fc3f7;
-            cursor: pointer;
-            flex-shrink: 0;
-        }
-        .checkbox-container label {
-            color: #c8d6e5;
-            font-size: 14px;
-            cursor: pointer;
-            margin: 0;
-        }
-        .checkbox-container.checked {
-            border-color: #66bb6a;
-            background: rgba(102,187,106,0.1);
-        }
+        .badge-success { background: rgba(102,187,106,0.2); color: #66bb6a; }
+        .badge-fail { background: rgba(239,83,80,0.2); color: #ef5350; }
         .text-center { text-align: center; }
         .mt-16 { margin-top: 16px; }
         .mb-16 { margin-bottom: 16px; }
@@ -149,19 +122,37 @@
             color: #fff;
         }
         .highlight { color: #4fc3f7; }
-        .progress-bar {
-            width: 100%;
-            height: 4px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 2px;
-            margin-top: 12px;
-            overflow: hidden;
+        .bypass-badge {
+            background: rgba(255,193,7,0.15);
+            border: 1px solid rgba(255,193,7,0.2);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #ffc107;
+            text-align: center;
+            margin-bottom: 12px;
         }
-        .progress-bar-inner {
-            height: 100%;
-            background: linear-gradient(90deg, #4fc3f7, #2196f3);
-            transition: width 0.5s;
+        .captcha-sim {
+            background: rgba(102,187,106,0.1);
+            border: 2px dashed rgba(102,187,106,0.3);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            color: #66bb6a;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 12px 0;
         }
+        .captcha-sim:hover {
+            background: rgba(102,187,106,0.2);
+            border-color: #66bb6a;
+        }
+        .captcha-sim.verified {
+            border-color: #66bb6a;
+            background: rgba(102,187,106,0.15);
+        }
+        .captcha-sim .icon { font-size: 28px; display: block; margin-bottom: 4px; }
     </style>
 </head>
 <body>
@@ -197,9 +188,10 @@
                     <input type="text" maxlength="1" class="code-input" data-index="5">
                 </div>
             </div>
-            <div class="checkbox-container" id="verifyCaptcha" onclick="toggleVerifyCaptcha()">
-                <input type="checkbox" id="verifyCheckbox">
-                <label for="verifyCheckbox">✅ I'm not a robot (bypass captcha)</label>
+            <!-- SIMULASI CAPTCHA (tanpa hCaptcha) -->
+            <div id="verifyCaptchaSim" class="captcha-sim" onclick="simulateCaptcha('verify')">
+                <span class="icon">🔒</span>
+                <span id="verifyCaptchaText">Klik untuk verifikasi (simulasi)</span>
             </div>
             <button class="btn" id="verifyBtn" onclick="verifyCode()" disabled>Verify & Continue</button>
             <div id="verifyStatus" class="status hidden"></div>
@@ -217,9 +209,10 @@
                 <p>Price: <strong class="highlight">€214.20/month</strong></p>
                 <p>IBAN: <strong id="ibanDisplay">Loading...</strong></p>
             </div>
-            <div class="checkbox-container" id="paymentCaptcha" onclick="togglePaymentCaptcha()">
-                <input type="checkbox" id="paymentCheckbox">
-                <label for="paymentCheckbox">✅ I'm not a robot (bypass captcha)</label>
+            <!-- SIMULASI CAPTCHA (tanpa hCaptcha) -->
+            <div id="paymentCaptchaSim" class="captcha-sim" onclick="simulateCaptcha('payment')">
+                <span class="icon">🔒</span>
+                <span id="paymentCaptchaText">Klik untuk verifikasi (simulasi)</span>
             </div>
             <button class="btn btn-success" id="paymentBtn" onclick="processPayment()" disabled>💳 Pay & Subscribe</button>
             <div id="paymentStatus" class="status hidden"></div>
@@ -247,11 +240,13 @@
         let state = {
             email: '',
             organizationUuid: '',
+            captchaToken: 'dummy-verified-token', // selalu dummy
+            paymentCaptchaToken: 'dummy-verified-token',
             iban: '',
             isProcessing: false,
             fableChecked: false,
-            verifyCaptchaToken: 'bypass-verify-' + Date.now(),
-            paymentCaptchaToken: 'bypass-payment-' + Date.now()
+            verifyCaptchaVerified: false,
+            paymentCaptchaVerified: false
         };
 
         // ==================== AUTO-FOCUS CODE INPUTS ====================
@@ -261,12 +256,16 @@
                 if (this.value.length === 1 && idx < inputs.length - 1) {
                     inputs[idx + 1].focus();
                 }
+                // Enable/disable verify button based on code length
+                const code = getCode();
+                document.getElementById('verifyBtn').disabled = !(code.length === 6 && state.verifyCaptchaVerified);
             });
             input.addEventListener('keydown', function(e) {
                 if (e.key === 'Backspace' && this.value.length === 0 && idx > 0) {
                     inputs[idx - 1].focus();
                 }
             });
+            // Paste support
             input.addEventListener('paste', function(e) {
                 e.preventDefault();
                 const paste = (e.clipboardData || window.clipboardData).getData('text');
@@ -276,6 +275,9 @@
                 });
                 const nextIndex = Math.min(digits.length, 5);
                 if (inputs[nextIndex]) inputs[nextIndex].focus();
+                // Update button state
+                const code = getCode();
+                document.getElementById('verifyBtn').disabled = !(code.length === 6 && state.verifyCaptchaVerified);
             });
         });
 
@@ -304,26 +306,22 @@
             document.getElementById(stepId).classList.remove('hidden');
         }
 
-        // ==================== CAPTCHA BYPASS ====================
-        function toggleVerifyCaptcha() {
-            const checkbox = document.getElementById('verifyCheckbox');
-            const container = document.getElementById('verifyCaptcha');
-            checkbox.checked = !checkbox.checked;
-            container.classList.toggle('checked', checkbox.checked);
-            document.getElementById('verifyBtn').disabled = !checkbox.checked;
-            if (checkbox.checked) {
-                state.verifyCaptchaToken = 'bypass-verify-' + Date.now();
-            }
-        }
-
-        function togglePaymentCaptcha() {
-            const checkbox = document.getElementById('paymentCheckbox');
-            const container = document.getElementById('paymentCaptcha');
-            checkbox.checked = !checkbox.checked;
-            container.classList.toggle('checked', checkbox.checked);
-            document.getElementById('paymentBtn').disabled = !checkbox.checked;
-            if (checkbox.checked) {
-                state.paymentCaptchaToken = 'bypass-payment-' + Date.now();
+        // ==================== SIMULASI CAPTCHA ====================
+        function simulateCaptcha(type) {
+            if (type === 'verify') {
+                state.verifyCaptchaVerified = true;
+                const el = document.getElementById('verifyCaptchaSim');
+                el.classList.add('verified');
+                document.getElementById('verifyCaptchaText').textContent = '✅ Verifikasi berhasil!';
+                // Enable verify button if code complete
+                const code = getCode();
+                document.getElementById('verifyBtn').disabled = !(code.length === 6);
+            } else if (type === 'payment') {
+                state.paymentCaptchaVerified = true;
+                const el = document.getElementById('paymentCaptchaSim');
+                el.classList.add('verified');
+                document.getElementById('paymentCaptchaText').textContent = '✅ Verifikasi berhasil!';
+                document.getElementById('paymentBtn').disabled = false;
             }
         }
 
@@ -344,6 +342,7 @@
             showStatus(statusEl, '⏳ Sending magic link...', 'info');
 
             try {
+                // 1. Login methods
                 const loginRes = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -352,6 +351,7 @@
                 const loginData = await loginRes.json();
                 console.log('Login methods:', loginData);
 
+                // 2. Send magic link
                 const sendRes = await fetch('/api/send-magic-link', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -366,6 +366,11 @@
                         showStep('step2');
                         hideStatus(statusEl);
                         document.querySelector('.code-input')?.focus();
+                        // Reset captcha sim
+                        state.verifyCaptchaVerified = false;
+                        document.getElementById('verifyCaptchaSim').classList.remove('verified');
+                        document.getElementById('verifyCaptchaText').textContent = 'Klik untuk verifikasi (simulasi)';
+                        document.getElementById('verifyBtn').disabled = true;
                     }, 1500);
                 } else {
                     showStatus(statusEl, '❌ Failed to send: ' + JSON.stringify(sendData), 'error');
@@ -383,8 +388,8 @@
                 showStatus(document.getElementById('verifyStatus'), 'Please enter all 6 digits', 'error');
                 return;
             }
-            if (!document.getElementById('verifyCheckbox').checked) {
-                showStatus(document.getElementById('verifyStatus'), 'Please verify you\'re not a robot', 'error');
+            if (!state.verifyCaptchaVerified) {
+                showStatus(document.getElementById('verifyStatus'), 'Please complete the verification', 'error');
                 return;
             }
 
@@ -399,7 +404,7 @@
                     body: JSON.stringify({
                         email: state.email,
                         code: code,
-                        hcaptcha_token: state.verifyCaptchaToken
+                        hcaptcha_token: 'dummy-token' // dummy, backend akan bypass
                     })
                 });
 
@@ -413,27 +418,29 @@
                     }
                     showStatus(statusEl, '✅ Verified! Redirecting to payment...', 'success');
                     
-                    document.getElementById('verifyBtn').disabled = true;
-                    document.getElementById('verifyCheckbox').checked = false;
-                    document.getElementById('verifyCaptcha').classList.remove('checked');
-                    
                     setTimeout(() => {
                         showStep('step3');
                         hideStatus(statusEl);
                         initializePayment();
+                        // Reset payment captcha sim
+                        state.paymentCaptchaVerified = false;
+                        document.getElementById('paymentCaptchaSim').classList.remove('verified');
+                        document.getElementById('paymentCaptchaText').textContent = 'Klik untuk verifikasi (simulasi)';
+                        document.getElementById('paymentBtn').disabled = true;
                     }, 1500);
                 } else {
                     showStatus(statusEl, '❌ Verification failed. Please check your code and try again.', 'error');
                     document.getElementById('verifyBtn').disabled = false;
-                    document.getElementById('verifyCheckbox').checked = false;
-                    document.getElementById('verifyCaptcha').classList.remove('checked');
+                    // Reset captcha sim
+                    state.verifyCaptchaVerified = false;
+                    document.getElementById('verifyCaptchaSim').classList.remove('verified');
+                    document.getElementById('verifyCaptchaText').textContent = 'Klik untuk verifikasi (simulasi)';
+                    document.getElementById('verifyBtn').disabled = true;
                 }
             } catch (error) {
                 console.error('Verify error:', error);
                 showStatus(statusEl, '❌ Error: ' + (error.message || 'Unknown error'), 'error');
                 document.getElementById('verifyBtn').disabled = false;
-                document.getElementById('verifyCheckbox').checked = false;
-                document.getElementById('verifyCaptcha').classList.remove('checked');
             }
         }
 
@@ -471,8 +478,8 @@
 
         // ==================== STEP 3: PROCESS PAYMENT ====================
         async function processPayment() {
-            if (!document.getElementById('paymentCheckbox').checked) {
-                showStatus(document.getElementById('paymentStatus'), 'Please verify you\'re not a robot', 'error');
+            if (!state.paymentCaptchaVerified) {
+                showStatus(document.getElementById('paymentStatus'), 'Please complete the verification', 'error');
                 return;
             }
 
@@ -481,6 +488,7 @@
             document.getElementById('paymentBtn').disabled = true;
 
             try {
+                // Approve subscription (bypass)
                 const approveRes = await fetch('/api/approve-subscription', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -488,7 +496,7 @@
                         email: state.email,
                         organization_uuid: state.organizationUuid,
                         checkout_session_id: 'bypass',
-                        hcaptcha_token: state.paymentCaptchaToken
+                        hcaptcha_token: 'dummy-token'
                     })
                 });
 
@@ -497,9 +505,6 @@
 
                 if (approveData.type === 'success' || approveData.message?.includes('simulated')) {
                     showStatus(statusEl, '✅ Payment approved! Checking for Fable 5...', 'success');
-                    document.getElementById('paymentCheckbox').checked = false;
-                    document.getElementById('paymentCaptcha').classList.remove('checked');
-                    
                     setTimeout(() => {
                         showStep('step4');
                         hideStatus(statusEl);
@@ -508,15 +513,11 @@
                 } else {
                     showStatus(statusEl, '❌ Payment failed: ' + JSON.stringify(approveData), 'error');
                     document.getElementById('paymentBtn').disabled = false;
-                    document.getElementById('paymentCheckbox').checked = false;
-                    document.getElementById('paymentCaptcha').classList.remove('checked');
                 }
             } catch (error) {
                 console.error('Payment error:', error);
                 showStatus(statusEl, '❌ Error: ' + (error.message || 'Unknown error'), 'error');
                 document.getElementById('paymentBtn').disabled = false;
-                document.getElementById('paymentCheckbox').checked = false;
-                document.getElementById('paymentCaptcha').classList.remove('checked');
             }
         }
 
@@ -565,12 +566,11 @@
                 if (retryCount < maxRetries) {
                     const delay = 2000;
                     const remaining = Math.round((maxRetries - retryCount) * delay / 1000);
-                    const progress = Math.min((retryCount / maxRetries) * 100, 100);
                     resultEl.innerHTML = `
                         <h3>⏳ Checking Fable 5...</h3>
                         <p style="font-size:13px; color:#8899aa;">Still activating... ${remaining}s remaining</p>
-                        <div class="progress-bar">
-                            <div class="progress-bar-inner" style="width:${progress}%;"></div>
+                        <div style="width:100%; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; margin-top:12px; overflow:hidden;">
+                            <div style="width:${(retryCount / maxRetries) * 100}%; height:100%; background:linear-gradient(90deg,#4fc3f7,#2196f3); transition:width 0.5s;"></div>
                         </div>
                     `;
                     await new Promise(resolve => setTimeout(resolve, delay));
@@ -607,21 +607,25 @@
             state = {
                 email: '',
                 organizationUuid: '',
+                captchaToken: 'dummy-verified-token',
+                paymentCaptchaToken: 'dummy-verified-token',
                 iban: '',
                 isProcessing: false,
                 fableChecked: false,
-                verifyCaptchaToken: 'bypass-verify-' + Date.now(),
-                paymentCaptchaToken: 'bypass-payment-' + Date.now()
+                verifyCaptchaVerified: false,
+                paymentCaptchaVerified: false
             };
             document.querySelectorAll('.code-input').forEach(input => input.value = '');
             document.getElementById('verifyBtn').disabled = true;
             document.getElementById('paymentBtn').disabled = true;
             document.getElementById('ibanDisplay').textContent = 'Loading...';
             document.getElementById('email').value = '';
-            document.getElementById('verifyCheckbox').checked = false;
-            document.getElementById('verifyCaptcha').classList.remove('checked');
-            document.getElementById('paymentCheckbox').checked = false;
-            document.getElementById('paymentCaptcha').classList.remove('checked');
+            
+            // Reset captcha sims
+            document.getElementById('verifyCaptchaSim').classList.remove('verified');
+            document.getElementById('verifyCaptchaText').textContent = 'Klik untuk verifikasi (simulasi)';
+            document.getElementById('paymentCaptchaSim').classList.remove('verified');
+            document.getElementById('paymentCaptchaText').textContent = 'Klik untuk verifikasi (simulasi)';
 
             showStep('step1');
             hideStatus(document.getElementById('loginStatus'));
@@ -630,7 +634,7 @@
             hideStatus(document.getElementById('globalStatus'));
         }
 
-        // ==================== KEYBOARD SHORTCUT ====================
+        // ==================== KEYBOARD SHORTCUT: Enter ====================
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 const step1 = document.getElementById('step1');
@@ -648,9 +652,8 @@
         });
 
         // ==================== INIT ====================
-        console.log('🚀 Claude Max Plan Auto Buy');
+        console.log('🚀 Claude Max Plan Auto Buy (Captcha bypass)');
         console.log('📧 Default email: nandabahari50@gmail.com');
-        console.log('⚡ Captcha bypass enabled');
     </script>
 </body>
 </html>
