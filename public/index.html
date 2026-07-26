@@ -1,41 +1,635 @@
-// Step 3: Process Payment (dengan bypass)
-async function processPayment() {
-    if (!state.paymentCaptchaToken) {
-        showStatus(document.getElementById('paymentStatus'), 'Please complete the captcha', 'error');
-        return;
-    }
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Auto Buy - Max Plan</title>
+    <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        h1 { color: #fff; font-size: 28px; margin-bottom: 8px; }
+        .subtitle { color: #8899aa; margin-bottom: 30px; font-size: 14px; }
+        .step { color: #4fc3f7; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; color: #c8d6e5; margin-bottom: 6px; font-size: 14px; }
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        input:focus { outline: none; border-color: #4fc3f7; background: rgba(255,255,255,0.08); }
+        input::placeholder { color: #556677; }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: linear-gradient(135deg, #4fc3f7, #2196f3);
+            color: #fff;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(79,195,247,0.3); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-success { background: linear-gradient(135deg, #66bb6a, #43a047); }
+        .btn-success:hover { box-shadow: 0 8px 25px rgba(102,187,106,0.3); }
+        .hidden { display: none !important; }
+        .code-inputs {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+        .code-inputs input {
+            width: 50px;
+            height: 60px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        .status {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            text-align: center;
+        }
+        .status-success { background: rgba(102,187,106,0.15); color: #66bb6a; border: 1px solid rgba(102,187,106,0.2); }
+        .status-error { background: rgba(239,83,80,0.15); color: #ef5350; border: 1px solid rgba(239,83,80,0.2); }
+        .status-info { background: rgba(79,195,247,0.15); color: #4fc3f7; border: 1px solid rgba(79,195,247,0.2); }
+        .result-box {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 16px;
+            border: 1px solid rgba(102,187,106,0.2);
+        }
+        .result-box h3 { color: #66bb6a; margin-bottom: 8px; }
+        .result-box p { color: #c8d6e5; font-size: 14px; }
+        .captcha-container {
+            display: flex;
+            justify-content: center;
+            margin: 16px 0;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-success { background: rgba(102,187,106,0.2); color: #66bb6a; }
+        .badge-fail { background: rgba(239,83,80,0.2); color: #ef5350; }
+        .text-center { text-align: center; }
+        .mt-16 { margin-top: 16px; }
+        .mb-16 { margin-bottom: 16px; }
+        .payment-detail {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .payment-detail p {
+            color: #c8d6e5;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        .payment-detail strong {
+            color: #fff;
+        }
+        .highlight { color: #4fc3f7; }
+        .bypass-badge {
+            background: rgba(255,193,7,0.15);
+            border: 1px solid rgba(255,193,7,0.2);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #ffc107;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <h1>🚀 Claude Max Plan</h1>
+        <p class="subtitle">Auto purchase Claude Max Plan with Fable 5</p>
 
-    const statusEl = document.getElementById('paymentStatus');
-    showStatus(statusEl, '⏳ Processing payment...', 'info');
-    document.getElementById('paymentBtn').disabled = true;
+        <!-- Step 1: Login -->
+        <div id="step1">
+            <div class="step">Step 1</div>
+            <h2 style="color:#fff; margin-bottom:20px;">Enter your email</h2>
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" id="email" placeholder="your@email.com" value="nandabahari50@gmail.com">
+            </div>
+            <button class="btn" onclick="sendMagicLink()">Send Magic Link</button>
+            <div id="loginStatus" class="status hidden"></div>
+        </div>
 
-    try {
-        // Panggil approve (sekarang bypass)
-        const approveRes = await fetch('/api/approve-subscription', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                email: state.email,
-                organization_uuid: state.organizationUuid,
-                checkout_session_id: 'bypass', // tidak dipakai
-                hcaptcha_token: state.paymentCaptchaToken
-            })
+        <!-- Step 2: Verify Code -->
+        <div id="step2" class="hidden">
+            <div class="step">Step 2</div>
+            <h2 style="color:#fff; margin-bottom:20px;">Enter verification code</h2>
+            <p style="color:#8899aa; font-size:14px; margin-bottom:16px;">Check your email for the 6-digit code</p>
+            <div class="form-group">
+                <label>6-Digit Code</label>
+                <div class="code-inputs">
+                    <input type="text" maxlength="1" class="code-input" data-index="0">
+                    <input type="text" maxlength="1" class="code-input" data-index="1">
+                    <input type="text" maxlength="1" class="code-input" data-index="2">
+                    <input type="text" maxlength="1" class="code-input" data-index="3">
+                    <input type="text" maxlength="1" class="code-input" data-index="4">
+                    <input type="text" maxlength="1" class="code-input" data-index="5">
+                </div>
+            </div>
+            <div class="captcha-container">
+                <div class="h-captcha" data-sitekey="50b2fe56-7d3a-4b3b-9a4e-4c6e8e6e8e6e" data-callback="onCaptchaVerified"></div>
+            </div>
+            <button class="btn" id="verifyBtn" onclick="verifyCode()" disabled>Verify & Continue</button>
+            <div id="verifyStatus" class="status hidden"></div>
+        </div>
+
+        <!-- Step 3: Payment -->
+        <div id="step3" class="hidden">
+            <div class="step">Step 3</div>
+            <h2 style="color:#fff; margin-bottom:20px;">Payment Details</h2>
+            <div class="bypass-badge">
+                ⚡ SIMULASI: Pembayaran akan langsung disetujui (bypass)
+            </div>
+            <div class="payment-detail">
+                <p>Plan: <strong>Max Plan - 20x</strong></p>
+                <p>Price: <strong class="highlight">€214.20/month</strong></p>
+                <p>IBAN: <strong id="ibanDisplay">Loading...</strong></p>
+            </div>
+            <div class="captcha-container">
+                <div class="h-captcha" data-sitekey="50b2fe56-7d3a-4b3b-9a4e-4c6e8e6e8e6e" data-callback="onPaymentCaptchaVerified"></div>
+            </div>
+            <button class="btn btn-success" id="paymentBtn" onclick="processPayment()" disabled>💳 Pay & Subscribe</button>
+            <div id="paymentStatus" class="status hidden"></div>
+        </div>
+
+        <!-- Step 4: Success -->
+        <div id="step4" class="hidden">
+            <div class="text-center" style="padding:20px 0;">
+                <div style="font-size:64px; margin-bottom:16px;">🎉</div>
+                <h2 style="color:#66bb6a;">Payment Successful!</h2>
+                <p style="color:#c8d6e5; margin:16px 0;">Your Claude Max Plan is now active</p>
+                <div class="result-box" id="fableResult">
+                    <h3>⏳ Checking Fable 5...</h3>
+                    <p style="font-size:13px; color:#8899aa;">Please wait, this may take a moment...</p>
+                </div>
+                <button class="btn" onclick="resetApp()" style="margin-top:20px;">🔄 Make New</button>
+            </div>
+        </div>
+
+        <div id="globalStatus" class="status hidden"></div>
+    </div>
+
+    <script>
+        // ==================== STATE ====================
+        let state = {
+            email: '',
+            organizationUuid: '',
+            captchaToken: '',
+            paymentCaptchaToken: '',
+            iban: '',
+            isProcessing: false,
+            fableChecked: false
+        };
+
+        // ==================== AUTO-FOCUS CODE INPUTS ====================
+        document.querySelectorAll('.code-input').forEach((input, idx, inputs) => {
+            input.addEventListener('input', function() {
+                this.value = this.value.replace(/\D/g, '');
+                if (this.value.length === 1 && idx < inputs.length - 1) {
+                    inputs[idx + 1].focus();
+                }
+            });
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Backspace' && this.value.length === 0 && idx > 0) {
+                    inputs[idx - 1].focus();
+                }
+            });
+            // Paste support
+            input.addEventListener('paste', function(e) {
+                e.preventDefault();
+                const paste = (e.clipboardData || window.clipboardData).getData('text');
+                const digits = paste.replace(/\D/g, '').slice(0, 6);
+                digits.split('').forEach((d, i) => {
+                    if (inputs[i]) inputs[i].value = d;
+                });
+                const nextIndex = Math.min(digits.length, 5);
+                if (inputs[nextIndex]) inputs[nextIndex].focus();
+            });
         });
 
-        const approveData = await approveRes.json();
-        console.log('Approve response:', approveData);
-
-        if (approveData.type === 'success' || approveData.message?.includes('simulated')) {
-            showStatus(statusEl, '✅ Payment approved! Checking for Fable 5...', 'success');
-            await checkFable5();
-        } else {
-            showStatus(statusEl, '❌ Payment failed: ' + JSON.stringify(approveData), 'error');
-            document.getElementById('paymentBtn').disabled = false;
-            state.paymentCaptchaToken = '';
-            if (window.hcaptcha) window.hcaptcha.reset();
+        function getCode() {
+            let code = '';
+            document.querySelectorAll('.code-input').forEach(input => code += input.value);
+            return code;
         }
-    } catch (error) {
-        showStatus(statusEl, '❌ Error: ' + error.message, 'error');
-        document.getElementById('paymentBtn').disabled = false;
-    }
-}
+
+        // ==================== UI HELPERS ====================
+        function showStatus(element, message, type) {
+            element.textContent = message;
+            element.className = `status status-${type} hidden`;
+            void element.offsetWidth;
+            element.classList.remove('hidden');
+        }
+
+        function hideStatus(element) {
+            element.classList.add('hidden');
+        }
+
+        function showStep(stepId) {
+            document.querySelectorAll('#step1, #step2, #step3, #step4').forEach(el => {
+                el.classList.add('hidden');
+            });
+            document.getElementById(stepId).classList.remove('hidden');
+        }
+
+        // ==================== hCAPTCHA CALLBACKS ====================
+        function onCaptchaVerified(token) {
+            state.captchaToken = token;
+            document.getElementById('verifyBtn').disabled = false;
+        }
+
+        function onPaymentCaptchaVerified(token) {
+            state.paymentCaptchaToken = token;
+            document.getElementById('paymentBtn').disabled = false;
+        }
+
+        // ==================== STEP 1: SEND MAGIC LINK ====================
+        async function sendMagicLink() {
+            const email = document.getElementById('email').value.trim();
+            if (!email) {
+                showStatus(document.getElementById('loginStatus'), 'Please enter your email', 'error');
+                return;
+            }
+            if (!email.includes('@')) {
+                showStatus(document.getElementById('loginStatus'), 'Please enter a valid email', 'error');
+                return;
+            }
+
+            state.email = email;
+            const statusEl = document.getElementById('loginStatus');
+            showStatus(statusEl, '⏳ Sending magic link...', 'info');
+
+            try {
+                // 1. Login methods
+                const loginRes = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const loginData = await loginRes.json();
+                console.log('Login methods:', loginData);
+
+                // 2. Send magic link
+                const sendRes = await fetch('/api/send-magic-link', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const sendData = await sendRes.json();
+                console.log('Send magic link:', sendData);
+
+                if (sendData.sent) {
+                    showStatus(statusEl, '✅ Magic link sent! Check your email for the 6-digit code', 'success');
+                    setTimeout(() => {
+                        showStep('step2');
+                        hideStatus(statusEl);
+                        // Focus first code input
+                        document.querySelector('.code-input')?.focus();
+                    }, 1500);
+                } else {
+                    showStatus(statusEl, '❌ Failed to send: ' + JSON.stringify(sendData), 'error');
+                }
+            } catch (error) {
+                console.error('Send magic link error:', error);
+                showStatus(statusEl, '❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        // ==================== STEP 2: VERIFY CODE ====================
+        async function verifyCode() {
+            const code = getCode();
+            if (code.length !== 6) {
+                showStatus(document.getElementById('verifyStatus'), 'Please enter all 6 digits', 'error');
+                return;
+            }
+            if (!state.captchaToken) {
+                showStatus(document.getElementById('verifyStatus'), 'Please complete the captcha', 'error');
+                return;
+            }
+
+            const statusEl = document.getElementById('verifyStatus');
+            showStatus(statusEl, '⏳ Verifying code...', 'info');
+            document.getElementById('verifyBtn').disabled = true;
+
+            try {
+                const response = await fetch('/api/verify-magic-link', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: state.email,
+                        code: code,
+                        hcaptcha_token: state.captchaToken
+                    })
+                });
+
+                const data = await response.json();
+                console.log('Verify response:', data);
+
+                if (data.account) {
+                    state.organizationUuid = data.account.memberships[0]?.organization?.uuid || '';
+                    if (!state.organizationUuid) {
+                        throw new Error('Organization UUID not found');
+                    }
+                    showStatus(statusEl, '✅ Verified! Redirecting to payment...', 'success');
+                    
+                    // Reset captcha token (cannot reuse)
+                    state.captchaToken = '';
+                    document.getElementById('verifyBtn').disabled = true;
+                    // Reset hCaptcha
+                    if (window.hcaptcha) window.hcaptcha.reset();
+                    
+                    setTimeout(() => {
+                        showStep('step3');
+                        hideStatus(statusEl);
+                        initializePayment();
+                    }, 1500);
+                } else {
+                    showStatus(statusEl, '❌ Verification failed. Please check your code and try again.', 'error');
+                    document.getElementById('verifyBtn').disabled = false;
+                    state.captchaToken = '';
+                    if (window.hcaptcha) window.hcaptcha.reset();
+                }
+            } catch (error) {
+                console.error('Verify error:', error);
+                showStatus(statusEl, '❌ Error: ' + (error.message || 'Unknown error'), 'error');
+                document.getElementById('verifyBtn').disabled = false;
+                state.captchaToken = '';
+                if (window.hcaptcha) window.hcaptcha.reset();
+            }
+        }
+
+        // ==================== STEP 3: PAYMENT ====================
+        async function initializePayment() {
+            const statusEl = document.getElementById('paymentStatus');
+            showStatus(statusEl, '⏳ Preparing payment...', 'info');
+
+            try {
+                const response = await fetch('/api/create-payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: state.email,
+                        organization_uuid: state.organizationUuid,
+                        name: 'Customer'
+                    })
+                });
+
+                const data = await response.json();
+                console.log('Payment init:', data);
+
+                if (data.success) {
+                    state.iban = data.iban || 'DE39500105175698378662';
+                    document.getElementById('ibanDisplay').textContent = state.iban;
+                    hideStatus(statusEl);
+                } else {
+                    showStatus(statusEl, '❌ Payment init failed: ' + JSON.stringify(data), 'error');
+                }
+            } catch (error) {
+                console.error('Payment init error:', error);
+                showStatus(statusEl, '❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        // ==================== STEP 3: PROCESS PAYMENT ====================
+        async function processPayment() {
+            if (!state.paymentCaptchaToken) {
+                showStatus(document.getElementById('paymentStatus'), 'Please complete the captcha', 'error');
+                return;
+            }
+
+            const statusEl = document.getElementById('paymentStatus');
+            showStatus(statusEl, '⏳ Processing payment...', 'info');
+            document.getElementById('paymentBtn').disabled = true;
+
+            try {
+                // Approve subscription (bypass)
+                const approveRes = await fetch('/api/approve-subscription', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: state.email,
+                        organization_uuid: state.organizationUuid,
+                        checkout_session_id: 'bypass',
+                        hcaptcha_token: state.paymentCaptchaToken
+                    })
+                });
+
+                const approveData = await approveRes.json();
+                console.log('Approve response:', approveData);
+
+                if (approveData.type === 'success' || approveData.message?.includes('simulated')) {
+                    showStatus(statusEl, '✅ Payment approved! Checking for Fable 5...', 'success');
+                    state.paymentCaptchaToken = '';
+                    if (window.hcaptcha) {
+                        try { window.hcaptcha.reset(); } catch(e) {}
+                    }
+                    // Pindah ke step 4
+                    setTimeout(() => {
+                        showStep('step4');
+                        hideStatus(statusEl);
+                        checkFable5();
+                    }, 1000);
+                } else {
+                    showStatus(statusEl, '❌ Payment failed: ' + JSON.stringify(approveData), 'error');
+                    document.getElementById('paymentBtn').disabled = false;
+                    state.paymentCaptchaToken = '';
+                    if (window.hcaptcha) {
+                        try { window.hcaptcha.reset(); } catch(e) {}
+                    }
+                }
+            } catch (error) {
+                console.error('Payment error:', error);
+                showStatus(statusEl, '❌ Error: ' + (error.message || 'Unknown error'), 'error');
+                document.getElementById('paymentBtn').disabled = false;
+                state.paymentCaptchaToken = '';
+                if (window.hcaptcha) {
+                    try { window.hcaptcha.reset(); } catch(e) {}
+                }
+            }
+        }
+
+        // ==================== STEP 4: CHECK FABLE 5 ====================
+        async function checkFable5(retryCount = 0) {
+            const maxRetries = 30; // ~60 detik
+            const resultEl = document.getElementById('fableResult');
+
+            try {
+                const response = await fetch('/api/check-fable5', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: state.email,
+                        organization_uuid: state.organizationUuid
+                    })
+                });
+
+                const data = await response.json();
+                console.log('Fable5 check:', data);
+
+                if (data.hasFable5) {
+                    resultEl.innerHTML = `
+                        <h3>✅ Fable 5 Available!</h3>
+                        <p style="font-size:13px; color:#8899aa;">Model: <strong style="color:#4fc3f7;">${data.model || 'claude-fable-5'}</strong></p>
+                        <p style="font-size:13px; color:#8899aa;">Thinking Mode: <strong style="color:#4fc3f7;">High Effort</strong></p>
+                        <p style="font-size:12px; color:#66bb6a; margin-top:8px;">🎉 Your Max Plan is active!</p>
+                    `;
+                    state.fableChecked = true;
+                    return;
+                }
+
+                // Check if fable-5 is in the thinking_by_model list
+                if (data.thinking && Array.isArray(data.thinking)) {
+                    const hasFableInList = data.thinking.some(t => t.id === 'claude-fable-5');
+                    if (hasFableInList) {
+                        resultEl.innerHTML = `
+                            <h3>✅ Fable 5 Detected!</h3>
+                            <p style="font-size:13px; color:#8899aa;">Model: <strong style="color:#4fc3f7;">claude-fable-5</strong></p>
+                            <p style="font-size:12px; color:#66bb6a; margin-top:8px;">🎉 Your Max Plan is active!</p>
+                        `;
+                        state.fableChecked = true;
+                        return;
+                    }
+                }
+
+                // Retry if not found
+                if (retryCount < maxRetries) {
+                    const delay = 2000; // 2 detik
+                    const remaining = Math.round((maxRetries - retryCount) * delay / 1000);
+                    resultEl.innerHTML = `
+                        <h3>⏳ Checking Fable 5...</h3>
+                        <p style="font-size:13px; color:#8899aa;">Still activating... ${remaining}s remaining</p>
+                        <div style="width:100%; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; margin-top:12px; overflow:hidden;">
+                            <div style="width:${(retryCount / maxRetries) * 100}%; height:100%; background:linear-gradient(90deg,#4fc3f7,#2196f3); transition:width 0.5s;"></div>
+                        </div>
+                    `;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    await checkFable5(retryCount + 1);
+                } else {
+                    resultEl.innerHTML = `
+                        <h3 style="color:#ffc107;">⏳ Still Activating</h3>
+                        <p style="font-size:13px; color:#8899aa;">Fable 5 is not available yet. It may take a few more minutes.</p>
+                        <button class="btn" onclick="checkFable5(0)" style="margin-top:12px; font-size:14px; padding:10px;">🔄 Check Again</button>
+                    `;
+                }
+            } catch (error) {
+                console.error('Check Fable5 error:', error);
+                if (retryCount < maxRetries) {
+                    const delay = 3000;
+                    resultEl.innerHTML = `
+                        <h3 style="color:#ffc107;">⚠️ Connection Issue</h3>
+                        <p style="font-size:13px; color:#8899aa;">Retrying... (${retryCount + 1}/${maxRetries})</p>
+                    `;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    await checkFable5(retryCount + 1);
+                } else {
+                    resultEl.innerHTML = `
+                        <h3 style="color:#ef5350;">❌ Error Checking</h3>
+                        <p style="font-size:13px; color:#8899aa;">${error.message || 'Unknown error'}</p>
+                        <button class="btn" onclick="checkFable5(0)" style="margin-top:12px; font-size:14px; padding:10px;">🔄 Retry</button>
+                    `;
+                }
+            }
+        }
+
+        // ==================== RESET APP ====================
+        function resetApp() {
+            state = {
+                email: '',
+                organizationUuid: '',
+                captchaToken: '',
+                paymentCaptchaToken: '',
+                iban: '',
+                isProcessing: false,
+                fableChecked: false
+            };
+            document.querySelectorAll('.code-input').forEach(input => input.value = '');
+            document.getElementById('verifyBtn').disabled = true;
+            document.getElementById('paymentBtn').disabled = true;
+            document.getElementById('ibanDisplay').textContent = 'Loading...';
+            document.getElementById('email').value = '';
+            
+            // Reset hCaptcha
+            if (window.hcaptcha) {
+                try {
+                    const widgets = document.querySelectorAll('.h-captcha');
+                    widgets.forEach(el => {
+                        if (el._hcaptcha) {
+                            el._hcaptcha.reset();
+                        }
+                    });
+                } catch(e) {}
+            }
+
+            showStep('step1');
+            hideStatus(document.getElementById('loginStatus'));
+            hideStatus(document.getElementById('verifyStatus'));
+            hideStatus(document.getElementById('paymentStatus'));
+            hideStatus(document.getElementById('globalStatus'));
+        }
+
+        // ==================== KEYBOARD SHORTCUT: Enter ====================
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                const step1 = document.getElementById('step1');
+                const step2 = document.getElementById('step2');
+                const step3 = document.getElementById('step3');
+                const step4 = document.getElementById('step4');
+                
+                if (!step1.classList.contains('hidden') && document.getElementById('email').value) {
+                    sendMagicLink();
+                } else if (!step2.classList.contains('hidden') && !document.getElementById('verifyBtn').disabled) {
+                    verifyCode();
+                } else if (!step3.classList.contains('hidden') && !document.getElementById('paymentBtn').disabled) {
+                    processPayment();
+                }
+            }
+        });
+
+        // ==================== INIT ====================
+        console.log('🚀 Claude Max Plan Auto Buy');
+        console.log('📧 Default email: nandabahari50@gmail.com');
+    </script>
+</body>
+</html>
