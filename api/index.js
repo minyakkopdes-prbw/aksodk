@@ -4,14 +4,24 @@ const axios = require('axios');
 const path = require('path');
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
 
+// 🔥 Serve static files from 'public' folder (Vercel akan menemukannya)
+app.use(express.static(path.join(__dirname, '../public')));
+
+// 🔥 Handler untuk root path '/'
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+// ============================================
+// CONSTANTS & HELPERS
+// ============================================
 const CLAUDE_API = 'https://claude.ai';
 const userSessions = new Map();
 
-// Generate IBAN Jerman
 function generateGermanIBAN() {
   const bankCode = '50010517';
   const accountNumber = String(Math.floor(Math.random() * 999999999)).padStart(10, '0');
@@ -19,7 +29,6 @@ function generateGermanIBAN() {
   return `DE${checkDigits}${bankCode}${accountNumber}`;
 }
 
-// Ambil header dengan cookie session user
 function getHeadersWithSession(email) {
   const session = userSessions.get(email);
   return {
@@ -32,7 +41,9 @@ function getHeadersWithSession(email) {
   };
 }
 
-// ==================== ENDPOINTS ====================
+// ============================================
+// API ENDPOINTS
+// ============================================
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -186,7 +197,7 @@ app.post('/api/approve-subscription', async (req, res) => {
       return res.status(401).json({ error: 'No session found for this user. Please login again.' });
     }
 
-    // Perbaikan: hcaptcha_token di dalam client_attestation
+    // 🔥 Perbaikan: hcaptcha_token di dalam client_attestation
     const payload = {
       client_attestation: {
         hcaptcha_token: hcaptcha_token
@@ -248,5 +259,7 @@ app.post('/api/logout', (req, res) => {
   res.json({ success: true });
 });
 
-// ==================== EKSPOR UNTUK VERCEL ====================
+// ============================================
+// EKSPOR UNTUK VERCEL (serverless)
+// ============================================
 export default app;
