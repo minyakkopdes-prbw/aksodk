@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const path = require('path');
 const app = express();
 
 app.use(cors());
@@ -10,11 +11,10 @@ app.use(express.static('public'));
 const CLAUDE_API = 'https://claude.ai';
 const userSessions = new Map();
 
-// Generate IBAN Jerman (DE + 2 digit + 8 digit bank code + 10 digit account)
+// Generate IBAN Jerman
 function generateGermanIBAN() {
   const bankCode = '50010517';
   const accountNumber = String(Math.floor(Math.random() * 999999999)).padStart(10, '0');
-  // Checksum disederhanakan, tapi tetap valid format
   const checkDigits = String(Math.floor(Math.random() * 90) + 10);
   return `DE${checkDigits}${bankCode}${accountNumber}`;
 }
@@ -34,7 +34,12 @@ function getHeadersWithSession(email) {
 
 // ==================== ENDPOINTS ====================
 
-// 1. Login - dapatkan metode login
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// 1. Login
 app.post('/api/login', async (req, res) => {
   try {
     const { email } = req.body;
@@ -167,7 +172,7 @@ app.post('/api/create-payment', async (req, res) => {
   }
 });
 
-// 5. Approve subscription (diperbaiki payload-nya)
+// 5. Approve subscription (payload diperbaiki)
 app.post('/api/approve-subscription', async (req, res) => {
   try {
     const { email, organization_uuid, checkout_session_id, hcaptcha_token } = req.body;
@@ -181,7 +186,7 @@ app.post('/api/approve-subscription', async (req, res) => {
       return res.status(401).json({ error: 'No session found for this user. Please login again.' });
     }
 
-    // 🔥 Perbaikan: kirim hcaptcha_token di dalam client_attestation, bukan di root
+    // Perbaikan: hcaptcha_token di dalam client_attestation
     const payload = {
       client_attestation: {
         hcaptcha_token: hcaptcha_token
@@ -236,7 +241,7 @@ app.post('/api/check-fable5', async (req, res) => {
   }
 });
 
-// 7. Logout - hapus session
+// 7. Logout
 app.post('/api/logout', (req, res) => {
   const { email } = req.body;
   userSessions.delete(email);
@@ -244,5 +249,4 @@ app.post('/api/logout', (req, res) => {
 });
 
 // ==================== EKSPOR UNTUK VERCEL ====================
-// Hapus app.listen() dan gunakan export default
 export default app;
