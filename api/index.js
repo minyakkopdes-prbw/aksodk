@@ -1,15 +1,21 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const crypto = require('crypto');
-
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
+// Serve static files from public folder
+const path = require('path');
+app.use(express.static(path.join(__dirname, '../public')));
+
 const CLAUDE_API = 'https://claude.ai';
+
+// Session storage
 const userSessions = new Map();
 
+// Generate German IBAN
 function generateGermanIBAN() {
   const bankCode = '50010517';
   const accountNumber = String(Math.floor(Math.random() * 999999999)).padStart(10, '0');
@@ -30,8 +36,14 @@ function getHeadersWithSession(email) {
   };
 }
 
-// === ROUTES ===
+// ==================== ROUTES ====================
 
+// Root path - serve index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+// 1. Login
 app.post('/api/login', async (req, res) => {
   try {
     const { email } = req.body;
@@ -54,6 +66,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// 2. Send magic link
 app.post('/api/send-magic-link', async (req, res) => {
   try {
     const { email, utc_offset = -420, locale = 'id-ID' } = req.body;
@@ -85,6 +98,7 @@ app.post('/api/send-magic-link', async (req, res) => {
   }
 });
 
+// 3. Verify magic link
 app.post('/api/verify-magic-link', async (req, res) => {
   try {
     const { email, code, hcaptcha_token, arkose_session_token } = req.body;
@@ -137,6 +151,7 @@ app.post('/api/verify-magic-link', async (req, res) => {
   }
 });
 
+// 4. Create payment
 app.post('/api/create-payment', async (req, res) => {
   try {
     const { email, organization_uuid, name } = req.body;
@@ -166,6 +181,7 @@ app.post('/api/create-payment', async (req, res) => {
   }
 });
 
+// 5. Approve subscription
 app.post('/api/approve-subscription', async (req, res) => {
   try {
     const { email, organization_uuid, checkout_session_id, hcaptcha_token } = req.body;
@@ -176,7 +192,7 @@ app.post('/api/approve-subscription', async (req, res) => {
 
     const headers = getHeadersWithSession(email);
     if (!headers.cookie) {
-      return res.status(401).json({ error: 'No session found. Please login again.' });
+      return res.status(401).json({ error: 'No session found for this user. Please login again.' });
     }
 
     const response = await axios.post(
@@ -195,13 +211,14 @@ app.post('/api/approve-subscription', async (req, res) => {
   }
 });
 
+// 6. Check Fable 5
 app.post('/api/check-fable5', async (req, res) => {
   try {
     const { email, organization_uuid } = req.body;
     
     const headers = getHeadersWithSession(email);
     if (!headers.cookie) {
-      return res.status(401).json({ error: 'No session found. Please login again.' });
+      return res.status(401).json({ error: 'No session found for this user. Please login again.' });
     }
 
     const response = await axios.patch(
@@ -227,11 +244,25 @@ app.post('/api/check-fable5', async (req, res) => {
   }
 });
 
+// 7. Logout
 app.post('/api/logout', (req, res) => {
   const { email } = req.body;
   userSessions.delete(email);
   res.json({ success: true });
 });
 
-// Vercel needs to export the app as a serverless function
+// Fallback to index.html for any other route (SPA support)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+// Export for Vercel
 module.exports = app;
