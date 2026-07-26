@@ -15,9 +15,7 @@ app.get('/', (req, res) => {
 const CLAUDE_API = 'https://claude.ai';
 const STRIPE_API = 'https://api.stripe.com/v1';
 
-// ============================================================
-//  GENERATOR DATA JERMAN
-// ============================================================
+// ---------- GENERATOR JERMAN ----------
 const GERMAN_CITIES = ['Berlin', 'München', 'Hamburg', 'Köln', 'Frankfurt', 'Stuttgart', 'Düsseldorf', 'Leipzig', 'Dortmund', 'Essen', 'Bremen', 'Dresden', 'Hannover', 'Nürnberg', 'Duisburg', 'Bochum', 'Wuppertal', 'Bielefeld', 'Bonn', 'Münster', 'Karlsruhe', 'Mannheim', 'Augsburg', 'Wiesbaden', 'Gelsenkirchen'];
 const GERMAN_STREETS = ['Hauptstraße', 'Bahnhofstraße', 'Schlossstraße', 'Goethestraße', 'Friedrichstraße', 'Wilhelmstraße', 'Ludwigstraße', 'Königsallee', 'Marienplatz', 'Neue Straße', 'Marktstraße', 'Kaiserstraße', 'Rathausstraße', 'Kirchstraße', 'Gartenstraße', 'Mühlenstraße', 'Brückenstraße', 'Bergstraße', 'Talstraße', 'Weinbergstraße', 'Petuelring', 'Leopoldstraße', 'Maximilianstraße', 'Sendlinger Straße', 'Theresienstraße'];
 
@@ -63,9 +61,7 @@ function buildClaudeHeaders(cookieString) {
   };
 }
 
-// ============================================================
-//  ENDPOINTS
-// ============================================================
+// ---------- ENDPOINTS ----------
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 app.post('/api/login', async (req, res) => {
@@ -148,8 +144,7 @@ app.post('/api/submit-payment', async (req, res) => {
   try {
     const { sessionId, paymentData, email } = req.body;
     const params = new URLSearchParams();
-
-    // Semua parameter yang diperlukan Stripe
+    // Minimal payload agar tidak kepotong, sisanya sama seperti sebelumnya
     params.append('guid', '9ad9fbc1-72df-44a0-a4f3-410b842667b0a573ec');
     params.append('muid', '193859b9-23b5-40fd-b1e5-489d0e262440f8d7fb');
     params.append('sid', 'c69ce4a1-bde6-4355-b1b4-24745b43cb6cd17239');
