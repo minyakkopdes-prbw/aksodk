@@ -10,10 +10,10 @@ app.use(express.static('public'));
 
 const CLAUDE_API = 'https://claude.ai';
 
-// Store sessions per user (key: email)
+// Session storage per user (key: email)
 const userSessions = new Map();
 
-// Generate German IBAN
+// Generate German IBAN (DE + 2 digit + 8 digit bank code + 10 digit account)
 function generateGermanIBAN() {
   const bankCode = '50010517';
   const accountNumber = String(Math.floor(Math.random() * 999999999)).padStart(10, '0');
@@ -35,7 +35,7 @@ function getHeadersWithSession(email) {
   };
 }
 
-// --- ENDPOINTS ---
+// ==================== ENDPOINTS ====================
 
 // 1. Login - get login methods
 app.post('/api/login', async (req, res) => {
@@ -130,7 +130,6 @@ app.post('/api/verify-magic-link', async (req, res) => {
     
     const cookies = response.headers['set-cookie'];
     if (cookies) {
-      // Store session for this user
       userSessions.set(email, {
         cookies: cookies.join('; '),
         userData: response.data
